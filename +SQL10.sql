@@ -10,7 +10,7 @@ DECLARE
     @MESSAGE VARCHAR(200)
 PRINT ' LIST CUSTOMERS:'
 --СОЗДАЕМ КУРСОР
-DECLARE KLIENT_CURSOR CURSOR LOCAL FOR  --LOCAL - УКАЗЫВАЕТ, ЧТО КУРСОР ЯВЛЯЕТСЯ ЛОКАЛЬНЫМ
+DECLARE KLIENT_CURSOR CURSOR FOR  
     SELECT CUST_NUM, COMPANY, CUST_REP, CREDIT_LIMIT
     FROM CUSTOMERS
     --WHERE COMPANY='First Corp.'
@@ -80,7 +80,7 @@ DECLARE @EMPL_NUM VARCHAR(45),
 		@MESSAGE VARCHAR(1000),
 		@QTY VARCHAR(100)
 DECLARE SALESREPS_CURSOR CURSOR 
-FOR SELECT EMPL_NUM, NAME, TITLE, SALES, COUNT(*) FROM SALESREPS GROUP BY EMPL_NUM, NAME, TITLE, SALES;
+	FOR SELECT EMPL_NUM, NAME, TITLE, SALES, COUNT(*) FROM SALESREPS GROUP BY EMPL_NUM, NAME, TITLE, SALES;
  
 OPEN SALESREPS_CURSOR;
  
@@ -101,7 +101,7 @@ DEALLOCATE SALESREPS_CURSOR
 
 -----------------------------------------------------------------------------------------------
 --3.	Разработать локальный курсор, который выводит все сведения о товарах и их среднюю цену.
-SELECT AVG(PRICE) 
+SELECT * --AVG(PRICE) 
 FROM PRODUCTS 
 WHERE MFR_ID = 'ACI'
 
@@ -114,10 +114,10 @@ DECLARE @MFR_ID VARCHAR(20),
 		@SEND_TO_DISPLAY VARCHAR(1000),
 		@DEFINITE_PRODUCT VARCHAR(100),
 		@ACI VARCHAR(100)
-DECLARE PRODUCTS_CURSOR CURSOR
-FOR SELECT DISTINCT MFR_ID, PRODUCT_ID, PRICE  
-FROM PRODUCTS 
-GROUP BY MFR_ID, PRODUCT_ID, PRICE;
+DECLARE PRODUCTS_CURSOR CURSOR LOCAL			--LOCAL - Указывает, что курсор является локальным по отношению к пакету, хранимой процедуре или триггеру
+	FOR SELECT DISTINCT MFR_ID, PRODUCT_ID, PRICE  
+	FROM PRODUCTS 
+	GROUP BY MFR_ID, PRODUCT_ID, PRICE;
 
 OPEN PRODUCTS_CURSOR;
 
@@ -149,10 +149,10 @@ DECLARE
 	@PRODUCT VARCHAR(20),
 	@SHOW_TO_DISPLAY VARCHAR(400)
 
-DECLARE ORDERS_CURSOR CURSOR 
-FOR	SELECT ORDER_NUM, ORDER_DATE, MFR, PRODUCT FROM ORDERS
-WHERE YEAR(ORDER_DATE)=2008 
-GROUP BY ORDER_NUM, ORDER_DATE, MFR, PRODUCT
+DECLARE ORDERS_CURSOR CURSOR GLOBAL   --GLOBAL - Указывает, что курсор является глобальным по отношению к соединению.
+	FOR	SELECT ORDER_NUM, ORDER_DATE, MFR, PRODUCT FROM ORDERS
+	WHERE YEAR(ORDER_DATE)=2008 
+	GROUP BY ORDER_NUM, ORDER_DATE, MFR, PRODUCT
 	
 OPEN ORDERS_CURSOR;
 
@@ -175,67 +175,109 @@ DEALLOCATE ORDERS_CURSOR
 --и создает временную копию данных, предназначенную для использования курсором. 
 --Все запросы к курсору обращаются к этой временной таблице в базе данных tempdb.
 SELECT * FROM CUSTOMERS
+SELECT * FROM ORDERS
+
 DECLARE 
-	@message2 varchar(80),
-	@cust_num2 int, 
-	@company2 varchar(15), 
-	@cust_rep2 int,
-    @credit_limit2 decimal(8, 2);
+	@message2 VARCHAR(80),
+	@cust_num2 INT, 
+	@company2 VARCHAR(15), 
+	@cust_rep2 INT,
+    @credit_limit2 DECIMAL(8, 2),
+	@ORDER_PRODUCT VARCHAR(30)
 
 DECLARE CUST_CURSOR CURSOR STATIC
-FOR SELECT CUST_NUM, COMPANY, CUST_REP, CREDIT_LIMIT FROM CUSTOMERS;
+FOR SELECT C.CUST_NUM, C.COMPANY, C.CUST_REP, C.CREDIT_LIMIT,
+			O.PRODUCT
+FROM CUSTOMERS C LEFT JOIN ORDERS O
+ON C.CUST_NUM = O.CUST
+
 OPEN CUST_CURSOR
 
-FETCH FROM CUST_CURSOR INTO @cust_num2, @company2, @cust_rep2, @credit_limit2;
+FETCH FROM CUST_CURSOR INTO @cust_num2, @company2, @cust_rep2, @credit_limit2, @ORDER_PRODUCT
 WHILE @@FETCH_STATUS = 0 
 BEGIN 
    SELECT @message2 = cast(@cust_num2 as varchar(20)) + '|||' + @company2 + '|||' + cast(@cust_rep2 as varchar(20)) + '|||' +
-      cast(@credit_limit2 as varchar(10))
-   PRINT @message2; 
-   FETCH FROM CUST_CURSOR INTO @cust_num2, @company2, @cust_rep2, @credit_limit2;
-   PRINT CAST(@@CURSOR_ROWS  AS VARCHAR(10))
+      cast(@credit_limit2 as varchar(10)) +'|||'+ @ORDER_PRODUCT
+   PRINT @message2 
+   FETCH FROM CUST_CURSOR INTO @cust_num2, @company2, @cust_rep2, @credit_limit2, @ORDER_PRODUCT
+   --PRINT CAST(@@CURSOR_ROWS  AS VARCHAR(10))
 END
 
 CLOSE CUST_CURSOR 
 DEALLOCATE CUST_CURSOR
 
---6.	Разработать динамический курсор, который обновляет данные о сотруднике в зависимости от суммы выполненных заказов (поле SALES).
+6.	Разработать динамический курсор, который обновляет данные о сотруднике в зависимости от суммы выполненных заказов (поле SALES).
+select *
+from salesreps
+
+DECLARE @NAME VARCHAR(50),  @TITLE VARCHAR(80), @SALES INT
+ 
+DECLARE UPDATE_CURSOR CURSOR DYNAMIC FOR  ----DYNAMIC Определяет курсор, который отображает все изменения данных, сделанные в строках результирующего набора
+    SELECT  NAME, TITLE, SALES 
+	FROM SALESREPS 
+
+OPEN UPDATE_CURSOR 
+  
+  FETCH FROM UPDATE_CURSOR INTO  @NAME, @TITLE, @SALES
+  WHILE @@FETCH_STATUS = 0 
+     BEGIN 
+		IF @SALES > 30000 UPDATE SALESREPS SET TITLE = 'NOTFORSALE' 
+			WHERE CURRENT OF UPDATE_CURSOR
+		FETCH FROM UPDATE_CURSOR INTO @NAME, @TITLE, @SALES
+		PRINT @SALES
+		PRINT @NAME
+     END 
+
+CLOSE UPDATE_CURSOR
+DEALLOCATE UPDATE_CURSOR
+
+--------------------------------------------------------
+--------------------------------------------------------
 SELECT * FROM ORDERS
-SELECT * FROM salesreps
+SELECT * FROM SALESREPS
+
 DECLARE 
 	@REP INT, 
 	@SALES DECIMAL(9, 2),
-	@SHOW_TO_DISPLAY VARCHAR(400);
+	@SHOW_TO_DISPLAY VARCHAR(400),
+	@MOHRE INT
 
-DECLARE UPDATE_CURSOR CURSOR LOCAL DYNAMIC 
-FOR	SELECT REP, SUM(AMOUNT) AS SUM_AOUNT FROM ORDERS
-GROUP BY REP;
+DECLARE UPDATE_CURSOR CURSOR LOCAL DYNAMIC   --DYNAMIC Определяет курсор, который отображает все изменения данных, сделанные в строках результирующего набора
+	FOR	SELECT REP, SUM(AMOUNT) AS SUM_AOUNT, AMOUNT 
+	FROM ORDERS
+	GROUP BY REP, AMOUNT
 	
 OPEN UPDATE_CURSOR;
 
-FETCH FROM UPDATE_CURSOR INTO @REP, @SALES;
+FETCH FROM UPDATE_CURSOR INTO @REP, @SALES, @MOHRE
 	--WHILE @@FETCH_STATUS = 0		--КОНТРОЛЬ ДОСТИЖЕНИЯ КОНЦА КУРСОРА - ЕСЛИ 0, ТО ВЫБОРКА ПРОШЛА УСПЕШНО
 WHILE @@FETCH_STATUS = 0
 BEGIN
-	UPDATE SALESREPS SET SALES = @SALES
-	WHERE EMPL_NUM=@REP
-	SELECT @SHOW_TO_DISPLAY = CAST(@REP AS VARCHAR(20))+'-----'+ CAST(@SALES AS VARCHAR(20))
-	PRINT @SHOW_TO_DISPLAY
-	FETCH FROM UPDATE_CURSOR INTO @REP, @SALES;
+	IF @MOHRE > 30000 
+	UPDATE ORDERS SET ORDER_NUM = NULL
+	WHERE CURRENT OF UPDATE_CURSOR;
+	--UPDATE SALESREPS SET SALES = @SALES
+	--WHERE EMPL_NUM=@REP
+	--SELECT @SHOW_TO_DISPLAY = CAST(@REP AS VARCHAR(20))+'-----'+ CAST(@SALES AS VARCHAR(20))
+	--PRINT @SHOW_TO_DISPLAY
+	FETCH FROM UPDATE_CURSOR INTO @REP, @SALES, @MOHRE
 END
-CLOSE UPDATE_CURSOR;
-DEALLOCATE UPDATE_CURSOR;
+
+CLOSE UPDATE_CURSOR
+DEALLOCATE UPDATE_CURSOR
+
 SELECT * FROM ORDERS WHERE REP=101
 
 --7.	Продемонстрировать свойства SCROLL.
 DECLARE SCROLL_CURSOR CURSOR SCROLL --CERSOR SCROLL - ЭТО КУРСОР ПРОКРУТКИ ОН ПОЗВОЛЯЕТ ПЕРЕМЕЩАТЬСЯ ПО СТРОКАМ РЕЗУЛЬТАТА
-FOR
-SELECT * FROM OFFICES;
+	FOR SELECT * FROM OFFICES;
+
 OPEN SCROLL_CURSOR
-	FETCH LAST FROM SCROLL_CURSOR;			--выбирает последнюю строку из набора результатов курсора
-	FETCH PRIOR FROM SCROLL_CURSOR;			--выборка предыдущей строки с текущей позиции курсора
-	FETCH ABSOLUTE 8 FROM SCROLL_CURSOR;		--извлекает n- ю строку из первой позиции курсора
-	FETCH FIRST FROM SCROLL_CURSOR;			--выбирает первую строку / запись из набора результатов курсора
-	FETCH RELATIVE 4 FROM SCROLL_CURSOR;		--выбирает n- ю строку из текущей позиции курсора
-CLOSE SCROLL_CURSOR;
-DEALLOCATE SCROLL_CURSOR;
+	
+	FETCH LAST FROM SCROLL_CURSOR			--выбирает последнюю строку из набора результатов курсора
+	FETCH PRIOR FROM SCROLL_CURSOR			--выборка предыдущей строки с текущей позиции курсора
+	FETCH ABSOLUTE 8 FROM SCROLL_CURSOR		--извлекает n- ю строку из первой позиции курсора
+	FETCH FIRST FROM SCROLL_CURSOR			--выбирает первую строку / запись из набора результатов курсора
+	FETCH RELATIVE 4 FROM SCROLL_CURSOR		--выбирает n- ю строку из текущей позиции курсора
+CLOSE SCROLL_CURSOR
+DEALLOCATE SCROLL_CURSOR
