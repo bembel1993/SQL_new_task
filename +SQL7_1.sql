@@ -102,10 +102,77 @@ END CATCH
 --READ UNCOMMITED Не изолирует операции чтения других транзакций
 --Транзакция не задает и не признает блокировок
 --Допускает проблемы:
---Грязное чтение
---Неповторяемое чтение 
---Фантомное чтение
+--------------------------------------------------------------------
+--Грязное чтение - чтение данных, добавленных или измененных транзакцией, которая впоследствии не подтвердится (откатится).
+--1--A-TRAN_2
+BEGIN TRAN
+SELECT * 
+FROM PRODUCTS
+WHERE PRODUCT_ID = '41001'
+--2--B-TRAN_1
+BEGIN TRAN
+UPDATE PRODUCTS
+SET PRICE = PRICE + 5
+WHERE PRODUCT_ID = '41001'
+--3--A-TRAN_2
+BEGIN TRAN
+SELECT * 
+FROM PRODUCTS
+WHERE PRODUCT_ID = '41001'
+--4--B-TRAN_1
+ROLLBACK
+-------------
+BEGIN TRAN
+SELECT * 
+FROM PRODUCTS
+WHERE PRODUCT_ID = '41001'
+---------------------------------------------------------------------
+--Неповторяемое чтение - при повторном чтении в рамках одной транзакции ранее прочитанные данные оказываются измененными.
+--1--B-TRAN_1
+BEGIN TRAN B1
+SELECT * 
+FROM PRODUCTS
+WHERE PRODUCT_ID = '41001'
+--2--A-TRAN_2
+BEGIN TRAN A2
+SELECT * 
+FROM PRODUCTS
+WHERE PRODUCT_ID = '41001'
+--3--B-TRAN_1
+--BEGIN TRAN
+UPDATE PRODUCTS
+SET PRICE = PRICE + 5
+WHERE PRODUCT_ID = '41001'
+COMMIT
+--4--A-TRAN_2
+BEGIN TRAN A2
+SELECT * 
+FROM PRODUCTS
+WHERE PRODUCT_ID = '41001'
+----------------
+ROLLBACK
 
+----------------------------------------------------------------------
+--Фантомное чтение - при повторном чтении в рамках одной транзакции одна и та же выборка дает разные множества строк.
+--1--B-TRAN_1
+BEGIN TRAN
+SELECT COUNT(CUST_NUM)
+FROM CUSTOMERS
+--2--A-TRAN_2
+BEGIN TRAN
+INSERT INTO CUSTOMERS VALUES(1001, 'HUAWEI', 110, 10000)
+COMMIT
+--3--B-TRAN_1
+BEGIN TRAN
+SELECT COUNT(CUST_NUM)
+FROM CUSTOMERS
+
+SELECT COUNT(CUST_NUM)
+FROM CUSTOMERS
+
+ROLLBACK
+----------------------------------------------------------------------
+SELECT * FROM CUSTOMERS
 SELECT * FROM OFFICES
 SELECT * FROM PRODUCTS
 --Чтение незафиксированным READ-UNCOMMITTED | 0: Есть проблемы с грязным чтением, неповторяющимся чтением и фантомным чтением
