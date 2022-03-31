@@ -262,16 +262,98 @@ N'<?xml version="1.0" encoding="UTF-16" ?>
 
 DROP XML SCHEMA COLLECTION SCHEMAFORTASK 
 
-5.	Создайте таблицу Imported_XML (столбцы – Id, Import_Date, XML_Text). Назначьте созданную схему для XML-столбца.
-6.	Создайте три XML файла ((1), (2), (3)), два из которых должны соответствовать схеме, а один не соответствует.
-7.	Загрузите созданные XML файлы (1), (2) в столбец XML_Text таблицы Imported_XML. Поясните ошибку при загрузке файла (3), не соответствующего схеме. 
-8.	Исправьте XML файл (3) и загрузите его в столбец XML_Text таблицы Imported_XML.
-9.	Создайте индекс по XML-столбцу для таблицы Imported_XML.
-10.	Найдите: 
+--5.	Создайте таблицу Imported_XML (столбцы – Id, Import_Date, XML_Text). Назначьте созданную схему для XML-столбца.
+CREATE TABLE Imported_XML(
+	ID INT PRIMARY KEY,
+	IMPORT_DATE DATE,
+	XML_TEXT XML)
+
+SELECT * FROM Imported_XML
+
+/*SELECT ID AS '@ID',
+	   IMPORT_DATE AS '@DATE',
+	   XML_TEXT AS '@XML_TEXT'
+FROM Imported_XML
+FOR XML PATH('ROOT')*/
+
+--6.	Создайте три XML файла ((1), (2), (3)), два из которых должны соответствовать схеме, а один не соответствует.
+--7.	Загрузите созданные XML файлы (1), (2) в столбец XML_Text таблицы Imported_XML. Поясните ошибку при загрузке файла (3), не соответствующего схеме. 
+--8.	Исправьте XML файл (3) и загрузите его в столбец XML_Text таблицы Imported_XML.
+DECLARE @XML_ONE VARCHAR(200)
+SET @XML_ONE = '
+<EMP_NAME>
+  <ROOT>
+	<ID>01</ID>
+	<FIRST_NAME>ALEX</FIRST_NAME>
+	<LAST_NAME>WALTER</LAST_NAME>
+  </ROOT>
+</EMP_NAME>'
+
+INSERT INTO Imported_XML VALUES(1, GETDATE(), @XML_ONE)
+
+DECLARE @XML_TWO VARCHAR(200)
+SET @XML_TWO = '
+<EMP_NAME>
+  <ROOT>
+	<ID>02</ID>
+	<FIRST_NAME>JHON</FIRST_NAME>
+	<LAST_NAME>SNOW</LAST_NAME>
+  </ROOT>
+</EMP_NAME>'
+
+INSERT INTO Imported_XML VALUES(2, GETDATE(), @XML_TWO)
+
+DECLARE @XML_THREE VARCHAR(200)
+SET @XML_THREE = '
+<EMP_NAME>
+  <ROOT>
+	<ID>03</ID>
+	<FIRST_NAME>NIK</FIRST_NAME>
+	<LAST_NAME>ROBERTS</LAST_NAME>
+	<AGE>20</AGE>
+  </ROOT>
+</EMP_NAME>'
+
+INSERT INTO Imported_XML VALUES(3, GETDATE(), @XML_THREE)
+
+SELECT * FROM Imported_XML
+
+DROP TABLE Imported_XML
+
+--9.	Создайте индекс по XML-столбцу для таблицы Imported_XML.
+CREATE PRIMARY XML INDEX IMPORTED_XML_IDX ON Imported_XML(XML_TEXT)
+--USING XML INDEX IMPORTTED_XML_IDX FOR PATH
+EXEC SP_HELPINDEX 'Imported_XML'
+
+SELECT * FROM Imported_XML
+
+DROP INDEX IMPORTED_XML_IDX ON Imported_XML
+
+--10.	Найдите: 
 10.1.	значения определенного узла для (3).
+SELECT Imported_XML.
+	   ID, 
+	   XML_TEXT.VALUE('/Imported_XML/EMP_NAME/ROOT', 'VARCHAR(MAX)') AS RESULT
+FROM Imported_XML
+WHERE ID = 3
+FOR XML AUTO, TYPE
+
 10.2.	значения определенного узла для всех файлов.
-10.3.	значения определенного атрибута для (1), (2).
-10.4.	значения определенного атрибута для всех файлов.
+SELECT ID, IMPORT_DATE, XML_TEXT.VALUE('/ID/IMPORT_DATE') AS VAL
+FROM Imported_XML
+FOR XML AUTO, TYPE
+
+--10.3.	значения определенного атрибута для (1), (2).
+SELECT ID, XML_TEXT.query('/ID/IMPORT_DATE')
+FROM Imported_XML
+WHERE ID IN (1, 2) 
+FOR XML AUTO, TYPE
+
+--10.4.	значения определенного атрибута для всех файлов.
+SELECT ID, IMPORT_DATE, XML_TEXT.query('/ID/IMPORT_DATE')
+FROM Imported_XML 
+FOR XML AUTO, TYPE
+
 11.	Измените значения XML файл (1), добавив узел и атрибут. 
 12.	Измените значения XML файл (2), удалив узел или атрибут.
 13.	Измените значения XML файл (3), обновив значение узла или атрибута.
