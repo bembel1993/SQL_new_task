@@ -354,6 +354,74 @@ SELECT ID, IMPORT_DATE, XML_TEXT.query('/ID/IMPORT_DATE')
 FROM Imported_XML 
 FOR XML AUTO, TYPE
 
-11.	Измените значения XML файл (1), добавив узел и атрибут. 
-12.	Измените значения XML файл (2), удалив узел или атрибут.
-13.	Измените значения XML файл (3), обновив значение узла или атрибута.
+--11.	Измените значения XML файл (1), добавив узел и атрибут. 
+DECLARE @XML_ONE XML = '
+<EMP_NAME>
+  <ROOT>
+	<ID>01</ID>
+	<FIRST_NAME>ALEX</FIRST_NAME>
+	<LAST_NAME>WALTER</LAST_NAME>
+  </ROOT>
+</EMP_NAME>'
+--SELECT @XML_ONE
+SET @XML_ONE.modify('INSERT <HIRE_DATE>22/02/2022</HIRE_DATE>
+into (/EMP_NAME/root)[1]')
+SELECT @XML_ONE
+--------EXAMPLE-1-INSERT-----------------
+DECLARE @myXMLDoc XML;
+SET @myXMLDoc = '
+<ROOT>
+	<PRODUCTDESCRIPTION RPODUCTID="1" PRODUCTNAME="ROAD BIKE">
+		<FEATURES>
+		</FEATURES>
+    </PRODUCTDESCRIPTION>
+		<PRODUCTDESCRIPTION RPODUCTID="1" PRODUCTNAME="ROAD BIKE">
+		<FEATURES>
+		</FEATURES>
+    </PRODUCTDESCRIPTION>
+</ROOT>' ;
+--SELECT @myXMLDoc
+SET @myXMLDoc.modify('
+insert <MAINTENANCE>3 YEAR parts and labor extended maintance</MAINTENANCE>
+into (/ROOT/PRODUCTDESCRIPTION/FEATURES)[1]');
+SELECT @myXMLDoc
+
+--12.	Измените значения XML файл (2), удалив узел или атрибут.
+--------EXAMPLE-2-DELETE------------------
+DECLARE @myXMLDoc XML;
+SET @myXMLDoc = '
+<ROOT>
+	<PRODUCTDESCRIPTION RPODUCTID="1" PRODUCTNAME="ROAD BIKE">
+		<FEATURES>
+		</FEATURES>
+    </PRODUCTDESCRIPTION>
+		<PRODUCTDESCRIPTION RPODUCTID="1" PRODUCTNAME="ROAD BIKE">
+		<FEATURES>
+		</FEATURES>
+    </PRODUCTDESCRIPTION>
+</ROOT>' ;
+--SELECT @myXMLDoc
+SET @myXMLDoc.modify('
+delete /ROOT/PRODUCTDESCRIPTION')
+SELECT @myXMLDoc
+
+--13.	Измените значения XML файл (3), обновив значение узла или атрибута.
+--------EXAMPLE-3-UPDATE------------------
+DECLARE @myXMLDoc XML;
+SET @myXMLDoc = '
+<ROOT>
+	<PRODUCTDESCRIPTION RPODUCTID="1" PRODUCTNAME="ROAD BIKE">
+		<FEATURES>
+		</FEATURES>
+    </PRODUCTDESCRIPTION>
+		<PRODUCTDESCRIPTION RPODUCTID="1" PRODUCTNAME="ROAD BIKE">
+		<FEATURES>
+		</FEATURES>
+    </PRODUCTDESCRIPTION>
+</ROOT>' ;
+--SELECT @myXMLDoc
+SET @myXMLDoc.modify('
+replace value of (/ROOT/PRODUCTDESCRIPTION/@PRODUCTNAME)[1]
+with   "THE NEW BIKE"
+')
+SELECT @myXMLDoc
