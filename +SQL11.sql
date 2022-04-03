@@ -106,7 +106,7 @@ SELECT  CITY as '@City',
 
 --2.	Отредактируйте полученный XML файл.
 DECLARE @HTDOC INT
-DECLARE @DOC VARCHAR(5000)
+DECLARE @DOC XML
 SET @DOC = 
 '<OFFICE_LIST EMPLOYEE_COUNT="12">
   <REGION REGION_NAME="Eastern" REGION_EMPLOYEE_COUNT="6">
@@ -137,9 +137,10 @@ SET @DOC =
 
 EXEC sp_xml_preparedocument @HTDOC OUTPUT, @DOC
 
-UPDATE OFFICE_LIST
-SET OFFICE_LIST.modify('insert <Accounting /> into (/OFFICE_LIST)[1]')
-
+SET @DOC.modify('
+insert <Accounting>COUNTED</Accounting> 
+into (/OFFICE_LIST)[1]')
+SELECT @DOC
 
 SELECT EMPLOYEE_COUNT AS '@EMPLOYEE_COUNT',
 	(SELECT R1.REGION AS '@REGION_NAME',
@@ -166,7 +167,7 @@ FOR XML PATH('OFFICE_LIST')
 
 --3.	Преобразуйте отредактированный XML файл в таблицы базы данных.
 DECLARE @HTDOC INT
-DECLARE @DOC VARCHAR(5000)
+DECLARE @DOC XML
 SET @DOC = 
 '<OFFICE_LIST EMPLOYEE_COUNT="12">
   <REGION REGION_NAME="Eastern" REGION_EMPLOYEE_COUNT="6">
@@ -210,7 +211,7 @@ FROM OPENXML(@HTDOC, '/OFFICE_LIST/REGION/CITY', 1)
 	CITY_EMPLOYEE_COUNT INT,
     CITY_CHEF VARCHAR(50))
 
-SELECT *
+/*SELECT *
 FROM OPENXML(@HTDOC, '/OFFICE_LIST/REGION/CITY', 1)  
     WITH (
 	EMPLOYEE_COUNT INT,
@@ -218,7 +219,7 @@ FROM OPENXML(@HTDOC, '/OFFICE_LIST/REGION/CITY', 1)
 	REGION_EMPLOYEE_COUNT INT,
     CITY VARCHAR(30),
 	CITY_EMPLOYEE_COUNT INT,
-    CITY_CHEF VARCHAR(50))
+    CITY_CHEF VARCHAR(50))*/
 
 --4.	Создайте XML-схему из Приложения 1, предварительно внесите какие-нибудь изменения.
 --XML Schema — язык описания структуры XML-документа – предназначен для определения правил, которым должен подчиняться документ
@@ -279,40 +280,70 @@ FOR XML PATH('ROOT')*/
 --6.	Создайте три XML файла ((1), (2), (3)), два из которых должны соответствовать схеме, а один не соответствует.
 --7.	Загрузите созданные XML файлы (1), (2) в столбец XML_Text таблицы Imported_XML. Поясните ошибку при загрузке файла (3), не соответствующего схеме. 
 --8.	Исправьте XML файл (3) и загрузите его в столбец XML_Text таблицы Imported_XML.
-DECLARE @XML_ONE VARCHAR(200)
+---------FILE_1------------
+DECLARE @XML_ONE XML 
 SET @XML_ONE = '
-<EMP_NAME>
-  <ROOT>
-	<ID>01</ID>
-	<FIRST_NAME>ALEX</FIRST_NAME>
-	<LAST_NAME>WALTER</LAST_NAME>
-  </ROOT>
-</EMP_NAME>'
-
+   <order>
+      <customer>customer_ONE</customer>
+        <address>
+             <factaddress>factaddress_ONE</factaddress>
+             <city>city_ONE</city>
+             <country>country_ONE</country>
+        </address>
+            <item>
+               <partnumber>partnumber_ONE</partnumber>
+               <description>description_ONE</description>
+               <quantity>1</quantity>
+               <price>13.05</price>
+            </item>
+         <orderid>1</orderid>
+         <orderdate>22/02/2022</orderdate>
+   </order>'
+--SELECT @XML_ONE
 INSERT INTO Imported_XML VALUES(1, GETDATE(), @XML_ONE)
 
-DECLARE @XML_TWO VARCHAR(200)
+---------FILE_2------------
+DECLARE @XML_TWO XML
 SET @XML_TWO = '
-<EMP_NAME>
-  <ROOT>
-	<ID>02</ID>
-	<FIRST_NAME>JHON</FIRST_NAME>
-	<LAST_NAME>SNOW</LAST_NAME>
-  </ROOT>
-</EMP_NAME>'
-
+   <order>
+      <customer>customer_TWO</customer>
+        <address>
+             <factaddress>factaddress_TWO</factaddress>
+             <city>city_TWO</city>
+             <country>country_TWO</country>
+        </address>
+            <item>
+               <partnumber>partnumber_TWO</partnumber>
+               <description>description_TWO</description>
+               <quantity>2</quantity>
+               <price>46.11</price>
+            </item>
+         <orderid>2</orderid>
+         <orderdate>12/05/2021</orderdate>
+   </order>'
+--SELECT @XML_TWO
 INSERT INTO Imported_XML VALUES(2, GETDATE(), @XML_TWO)
 
-DECLARE @XML_THREE VARCHAR(200)
+---------FILE_3------------
+DECLARE @XML_THREE XML
 SET @XML_THREE = '
-<EMP_NAME>
-  <ROOT>
-	<ID>03</ID>
-	<FIRST_NAME>NIK</FIRST_NAME>
-	<LAST_NAME>ROBERTS</LAST_NAME>
-	<AGE>20</AGE>
-  </ROOT>
-</EMP_NAME>'
+   <order>
+      <customer>customer_THREE</customer>
+        <address>
+             <factaddress>factaddress_THREE</factaddress>
+             <city>city_THREE</city>
+             <country>country_THREE</country>
+        </address>
+            <item>
+               <partnumber>partnumber_THRE</partnumber>
+               <description>description_THREE</description>
+               <quantity>3</quantity>
+               <price>20.90</price>
+            </item>
+         <orderid>3</orderid>
+         <orderdate>11/05/2022</orderdate>
+		 <root>ROOT</root>
+   </order>'
 
 INSERT INTO Imported_XML VALUES(3, GETDATE(), @XML_THREE)
 
@@ -331,15 +362,13 @@ DROP INDEX IMPORTED_XML_IDX ON Imported_XML
 
 --10.	Найдите: 
 10.1.	значения определенного узла для (3).
-SELECT Imported_XML.
-	   ID, 
-	   XML_TEXT.VALUE('/Imported_XML/EMP_NAME/ROOT', 'VARCHAR(MAX)') AS RESULT
+SELECT ID, XML_TEXT.value('/ID[1]/FIRST_NAME/LAST_NAME/', 'VARCHAR(MAX)') AS NAME
 FROM Imported_XML
 WHERE ID = 3
 FOR XML AUTO, TYPE
 
 10.2.	значения определенного узла для всех файлов.
-SELECT ID, IMPORT_DATE, XML_TEXT.VALUE('/ID/IMPORT_DATE') AS VAL
+SELECT ID, XML_TEXT.VALUE('/ID[1]/IMPORT_DATE', 'VARCHAR(MAX)') AS RESULT
 FROM Imported_XML
 FOR XML AUTO, TYPE
 
@@ -364,9 +393,12 @@ DECLARE @XML_ONE XML = '
   </ROOT>
 </EMP_NAME>'
 --SELECT @XML_ONE
-SET @XML_ONE.modify('INSERT <HIRE_DATE>22/02/2022</HIRE_DATE>
-into (/EMP_NAME/root)[1]')
+
+SET @XML_ONE.modify('
+insert <HIRE_DATE>22/02/2022</HIRE_DATE>
+into (/EMP_NAME/ROOT)[1]')
 SELECT @XML_ONE
+/*
 --------EXAMPLE-1-INSERT-----------------
 DECLARE @myXMLDoc XML;
 SET @myXMLDoc = '
@@ -385,8 +417,24 @@ SET @myXMLDoc.modify('
 insert <MAINTENANCE>3 YEAR parts and labor extended maintance</MAINTENANCE>
 into (/ROOT/PRODUCTDESCRIPTION/FEATURES)[1]');
 SELECT @myXMLDoc
+*/
 
 --12.	Измените значения XML файл (2), удалив узел или атрибут.
+---------FILE_2------------
+DECLARE @XML_TWO XML 
+SET @XML_TWO = '
+<EMP_NAME>
+  <ROOT>
+	<ID>02</ID>
+	<FIRST_NAME>JHON</FIRST_NAME>
+	<LAST_NAME>SNOW</LAST_NAME>
+  </ROOT>
+</EMP_NAME>'
+
+SET @XML_TWO.modify('
+delete /EMP_NUM/ROOT/ID')  --НЕ УДАЛЯЕТ
+SELECT @XML_TWO
+
 --------EXAMPLE-2-DELETE------------------
 DECLARE @myXMLDoc XML;
 SET @myXMLDoc = '
@@ -406,6 +454,23 @@ delete /ROOT/PRODUCTDESCRIPTION')
 SELECT @myXMLDoc
 
 --13.	Измените значения XML файл (3), обновив значение узла или атрибута.
+---------FILE_3------------
+DECLARE @XML_THREE XML = '
+<EMP_NAME>
+  <ROOT>
+	<ID CATEGORY = "EMPLOYEE">03</ID>
+	<FIRST_NAME>NIK</FIRST_NAME>
+	<LAST_NAME>ROBERTS</LAST_NAME>
+	<AGE>20</AGE>
+  </ROOT>
+</EMP_NAME>'
+--SELECT @XML_THREE
+
+SET @XML_THREE.modify('
+replace value of (/EMP_NUM/ROOT/ID/@CATEGORY)[1] 
+with   "FIRED"')   --НЕ ОБНОВЛЯЕТ
+SELECT @XML_THREE
+
 --------EXAMPLE-3-UPDATE------------------
 DECLARE @myXMLDoc XML;
 SET @myXMLDoc = '
